@@ -18,7 +18,8 @@ use Shopify\Exception\InvalidWebhookException;
 use Shopify\Utils;
 use Shopify\Webhooks\Registry;
 use Shopify\Webhooks\Topics;
-
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\CronController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -65,11 +66,20 @@ Route::get('/api/auth/callback', function (Request $request) {
     $shop = Utils::sanitizeShopDomain($request->query('shop'));
 
     $response = Registry::register('/api/webhooks', Topics::APP_UNINSTALLED, $shop, $session->getAccessToken());
+    $response2 = Registry::register('/api/product_delete', Topics::PRODUCTS_DELETE, $shop, $session->getAccessToken());
     if ($response->isSuccess()) {
         Log::debug("Registered APP_UNINSTALLED webhook for shop $shop");
     } else {
         Log::error(
             "Failed to register APP_UNINSTALLED webhook for shop $shop with response body: " .
+                print_r($response->getBody(), true)
+        );
+    }
+    if ($response2->isSuccess()) {
+        Log::debug("Registered PRODUCTS_DELETE webhook for shop $shop");
+    } else {
+        Log::error(
+            "Failed to register PRODUCTS_DELETE webhook for shop $shop with response body: " .
                 print_r($response->getBody(), true)
         );
     }
@@ -143,3 +153,21 @@ Route::post('/api/webhooks', function (Request $request) {
         return response()->json(['message' => "Got an exception when handling '$topic' webhook"], 500);
     }
 });
+
+// custom routes
+
+Route::get('/api/syncProducts',[ProductController::class,'sync'])->middleware('shopify.auth');
+Route::get('/api/syncstatus',[ProductController::class,'checkStatus'])->middleware('shopify.auth');
+Route::post('/api/product_delete',[ProductController::class,'delete']);
+Route::get('/api/sync',[CronController::class,'index']);
+Route::get('/api/products', function (Request $request) {
+    $session = $request->get('shopifySession');
+    $domain = $session->getShop();
+    $shop = explode('.',$domain);
+    if(Schema::hasTable($shop[0].'_products')){
+        $data = DB::table($shop[0].'_products')->select('title','sku','status')->get()->toArray();
+        return response(['status'=>true,'data'=>$data]);
+    }
+    return response(['status'=>true,'data'=>[]]);
+})->middleware('shopify.auth');
+//Check Syncing Status
