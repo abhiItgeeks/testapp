@@ -15,7 +15,7 @@
     "@shopify/app": "3.46.2",
     "@shopify/cli": "3.46.2"
   },
-  "author": "abhis",
+  "author": "10X",
   "private": true,
   "workspaces": [
     "web",
