@@ -159,15 +159,56 @@ Route::post('/api/webhooks', function (Request $request) {
 Route::get('/api/syncProducts',[ProductController::class,'sync'])->middleware('shopify.auth');
 Route::get('/api/syncstatus',[ProductController::class,'checkStatus'])->middleware('shopify.auth');
 Route::post('/api/product_delete',[ProductController::class,'delete']);
+//Check Syncing Status
 Route::get('/api/sync',[CronController::class,'index']);
+// get stored products
 Route::get('/api/products', function (Request $request) {
     $session = $request->get('shopifySession');
     $domain = $session->getShop();
     $shop = explode('.',$domain);
     if(Schema::hasTable($shop[0].'_products')){
-        $data = DB::table($shop[0].'_products')->select('title','sku','status')->get()->toArray();
-        return response(['status'=>true,'data'=>$data]);
+        $count = DB::table($shop[0].'_products')->select('*')->get()->count();
+        $allPages = ceil($count / 10);
+        if (!empty($request->type)) {
+            $type = $request->type;
+            $page = $request->page;
+            if ($type == 'prev') {
+                if ($page == 1 && $page < 1) {
+                    $page = 1;
+                }
+                if ($page > 1) {
+                    $page--;
+                }
+            } elseif ($type == 'next') {
+                if ($page < $allPages) {
+                    $page++;
+                }
+            }
+            $newpage = ($page - 1) * 10;
+        }else{
+            $newpage = 0;
+            $page = 1;
+        }
+        $data = DB::table($shop[0].'_products')->select('title','sku','status','updated_status','created_status')->offset($newpage)->limit(20)->get()->toArray();
+        if(isset($data) && !empty($data)){
+            return response()->json(['status'=>true,'data'=>$data,'page'=>$page,'allpages'=>$allPages]);
+        }
+        else{
+             return response()->json(['status'=>true,'data'=>'data Not Found','page'=>$page,'allpages'=>$allPages]);
+        }
     }
     return response(['status'=>true,'data'=>[]]);
 })->middleware('shopify.auth');
-//Check Syncing Status
+// get syncing details 
+Route::get('/api/syncedProducts',function(Request $request){
+    $session = $request->get('shopifySession');
+    $domain = $session->getShop();
+    $shop = explode('.',$domain);
+    if(Schema::hasTable($shop[0].'_products')){
+        $total = DB::table($shop[0].'_products')->select('*')->get()->count();
+        $synced = DB::table($shop[0].'_products')->select('*')->where('updated_status',true)->where('created_status',true)->get()->count();
+        return response(['status'=>true,'total'=>$total,'synced'=>$synced]);
+    }
+    return response(['status'=>false,'message'=>'something went wrong']);
+})->middleware('shopify.auth');
+
