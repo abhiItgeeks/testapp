@@ -16,7 +16,7 @@ export default function SyncProduct() {
         }).then((data)=>{
             setData(data);
             setDataLoading(false);
-        })
+        }) 
         fetch('/api/syncstatus').then((res)=>{
             return res.json();
         }).then((data)=>{
