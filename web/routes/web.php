@@ -168,7 +168,7 @@ Route::get('/api/products', function (Request $request) {
     $shop = explode('.',$domain);
     if(Schema::hasTable($shop[0].'_products')){
         $count = DB::table($shop[0].'_products')->select('*')->get()->count();
-        $allPages = ceil($count / 10);
+        $allPages = ceil($count / 20);
         if (!empty($request->type)) {
             $type = $request->type;
             $page = $request->page;
