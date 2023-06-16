@@ -184,7 +184,7 @@ Route::get('/api/products', function (Request $request) {
                     $page++;
                 }
             }
-            $newpage = ($page - 1) * 10;
+            $newpage = ($page - 1) * 20;
         }else{
             $newpage = 0;
             $page = 1;
