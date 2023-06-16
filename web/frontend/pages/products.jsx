@@ -94,7 +94,7 @@ export default function SyncProduct() {
                                             </td>
                                         </tr>
                                     :
-                                        data.status ? data.data.map((product)=>{
+                                        data.status && data.allpages != 0? data.data.map((product)=>{
                                             return(
                                                 <tr key={product.sku} className="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
                                                     <th scope="row" className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
