@@ -27,7 +27,7 @@ export default function Home() {
         return () => { 
             mountedRef.current = false
         }
-    },[])
+    })
     function syncProducts(){
         if(status.sync){
             return false;
