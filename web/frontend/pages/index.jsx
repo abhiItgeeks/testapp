@@ -23,6 +23,9 @@ export default function Home() {
             if (!mountedRef.current) return null
             setSynced(data)
             setSyncLoading(false)
+        }).catch((e)=>{
+            console.log(e);
+            setSyncLoading(false)
         })
         return () => { 
             mountedRef.current = false
