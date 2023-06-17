@@ -8,11 +8,16 @@ class CronController extends Controller
 {
     public function index(Request $request)
     {
+        
         $shops = DB::table('sessions')->select('shop','access_token')->whereNotNull('access_token')->where('access_token','<>','')->get()->toArray();
         foreach ($shops as $domain) {
             $shop = explode('.',$domain->shop);
             $shop_url = $domain->shop;
             $token = $domain->access_token;
+            $headers = [
+                'X-Shopify-Access-Token' => $token,
+                'Content-Type' => 'application/json'
+            ];
             $syncShops = DB::table('syncing')->where('shop',$shop[0])->where('sync',true)->first();
             if(!empty($syncShops)){
                 $getProducts = DB::table($syncShops->shop.'_products')->select('*')->where('updated_status',false)->orWhere('created_status',false)->limit(25)->get()->toArray();
@@ -49,6 +54,9 @@ class CronController extends Controller
                         $tags = $product['tags'];
                     }else{
                         $tags = '';
+                    }
+                    if(!empty($product['crmId'])){
+                        array_push($tags,$product['crmId']);
                     }
                     $mainImageUrl = [];
                     if(!empty($product['mainImageUrl'])){
@@ -90,74 +98,125 @@ class CronController extends Controller
                     }else{
                         $inventory = 0;
                     }
-                    $headers = [
-                        'X-Shopify-Access-Token' => $token,
-                        'Content-Type' => 'application/json'
-                    ];
-                    // dd($product);
-                    $body = [
-                        "product"=>[
-                            'title'=>$title,
-                            "body_html"=>$description,
-                            "vendor"=>$vendor,
-                            "status"=>strtolower($status),
-                            "product_type"=>$productType,
-                            "variants"=>[
-                                [
-                                    "price" => $price,
-                                    "sku" => $sku,
-                                    "inventory_management"=>'shopify',
-                                    "inventory_quantity"=>$inventory
+                    if (!$getProduct->created_status || !$getProduct->updated_status) {
+                        $query = 'query{
+                            products(query: "sku:'.$sku.'", first: 1) {
+                                nodes {
+                                id
+                                variants(first: 1) {
+                                    nodes {
+                                    id  
+                                    sku
+                                    }
+                                }
+                            }
+                            }
+                        }';
+                        $checkProducturl = 'https://'.$shop_url.'/admin/api/2023-04/graphql.json';
+                        $checkProductresponse = Http::withHeaders($headers)->post($checkProducturl,["query"=>$query]);
+                        $checkProductstatusCode = $checkProductresponse->status();
+                        $checkProduct = json_decode($checkProductresponse->getBody(), true);
+                        if(!empty($checkProduct['data']['products']['nodes'])){
+                            $existproduct = $checkProduct['data']['products']['nodes'];
+                            $productId = str_replace('gid://shopify/Product/','',$existproduct[0]['id']);
+                            foreach ($existproduct[0]['variants']['nodes'] as $var) {
+                                if($var['sku'] == $sku){
+                                    $var_sku = $var['sku'];
+                                    $variantId = str_replace('gid://shopify/ProductVariant/','',$var['id']);
+                                    $body = [
+                                        "product"=>[
+                                            'title'=>$title,
+                                            "body_html"=>$description,
+                                            "vendor"=>$vendor,
+                                            "status"=>strtolower($status),
+                                            "product_type"=>$productType,
+                                            "variants"=>[
+                                                [
+                                                    "price" => $price,
+                                                    "sku" => $sku,
+                                                    "inventory_management"=>'shopify',
+                                                    "inventory_quantity"=>$inventory,
+                                                    "inventory_policy"=>"continue"
+                                                ]
+                                            ],
+                                            "tags"=>$tags,
+                                            "images"=>$mainImageUrl,
+                                            "published_scope"=>$channels,
+                                            // "template_suffix"=>"template1",
+                                            // "metafields"=>[
+                                            //     [
+                                            //         "key" => "new",
+                                            //         "value" => "newvalue",
+                                            //         "type" => "single_line_text_field",
+                                            //         "namespace" => "global"
+                                            //     ]
+                                            // ]
+                                        ]
+                                    ];
+                                    $body['product']['id'] = $productId;
+                                    $url = 'https://'.$shop_url.'/admin/api/2023-04/products/'.$productId.'.json';
+                                    $response = Http::withHeaders($headers)->PUT($url,$body);
+                                    $statusCode = $response->status();
+                                    $responseBody = json_decode($response->getBody(), true);
+                                    if($statusCode == 200){
+                                        DB::table($shop[0].'_products')->where('sku',$sku)->update([
+                                            'updated_status'=>1,
+                                        ]);
+                                    }
+                                }
+                            }
+                        }else{
+                            $body = [
+                                "product"=>[
+                                    'title'=>$title,
+                                    "body_html"=>$description,
+                                    "vendor"=>$vendor,
+                                    "status"=>strtolower($status),
+                                    "product_type"=>$productType,
+                                    "variants"=>[
+                                        [
+                                            "price" => $price,
+                                            "sku" => $sku,
+                                            "inventory_management"=>'shopify',
+                                            "inventory_quantity"=>$inventory,
+                                            "inventory_policy"=>"continue"
+                                        ]
+                                    ],
+                                    "tags"=>$tags,
+                                    "images"=>$mainImageUrl,
+                                    "published_scope"=>$channels,
+                                    // "template_suffix"=>"template1",
+                                    // "metafields"=>[
+                                    //     [
+                                    //         "key" => "new",
+                                    //         "value" => "newvalue",
+                                    //         "type" => "single_line_text_field",
+                                    //         "namespace" => "global"
+                                    //     ]
+                                    // ]
                                 ]
-                            ],
-                            "tags"=>$tags,
-                            "images"=>$mainImageUrl,
-                            "published_scope"=>$channels,
-                            // "template_suffix"=>"template1",
-                            // "metafields"=>[
-                            //     [
-                            //         "key" => "new",
-                            //         "value" => "newvalue",
-                            //         "type" => "single_line_text_field",
-                            //         "namespace" => "global"
-                            //     ]
-                            // ]
-                        ]
-                    ];
-                    if (!$getProduct->created_status) {
-                        $url = 'https://'.$shop_url.'/admin/api/2023-04/products.json';
-                        $response = Http::withHeaders($headers)->post($url,$body);
-                        $statusCode = $response->status();
-                        $responseBody = json_decode($response->getBody(), true);
-                        $product_id = $responseBody['product']['id'];
-                        if($statusCode == 201){
-                            DB::table($shop[0].'_products')->where('sku',$sku)->update([
-                                'product_id'=>$product_id,
-                                'created_status'=>1,
-                                'updated_status'=>1,
-                            ]);
+                            ];
+                            $url = 'https://'.$shop_url.'/admin/api/2023-04/products.json';
+                            $response = Http::withHeaders($headers)->post($url,$body);
+                            $statusCode = $response->status();
+                            $responseBody = json_decode($response->getBody(), true);
+                            $product_id = $responseBody['product']['id'];
+                            if($statusCode == 201){
+                                DB::table($shop[0].'_products')->where('sku',$sku)->update([
+                                    'product_id'=>$product_id,
+                                    'created_status'=>1,
+                                    'updated_status'=>1,
+                                ]);
+                            }
                         }
                         // die;
-                    }else if(!$getProduct->updated_status){
-                        $id = $getProduct->product_id;
-                        $body['product']['id'] = $id;
-                        $url = 'https://'.$shop_url.'/admin/api/2023-04/products/'.$id.'.json';
-                        $response = Http::withHeaders($headers)->PUT($url,$body);
-                        $statusCode = $response->status();
-                        $responseBody = json_decode($response->getBody(), true);
-                        if($statusCode == 200){
-                            DB::table($shop[0].'_products')->where('sku',$sku)->update([
-                                'updated_status'=>1,
-                            ]);
-                        }
                     }
-                    // die;
                     
                 }
                 if(empty($getProducts)){
                     DB::table('syncing')->where('shop',$shop[0])->update([
                         'sync'=>false,
-                        'updated_at'=>date('Y/m/d H:i:s')
+                        // 'updated_at'=>date('Y/m/d H:i:s')
                     ]);
                 }
             }

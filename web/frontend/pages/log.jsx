@@ -1,17 +1,15 @@
-import { Card, Page, Layout, TextContainer, Text, Pagination } from "@shopify/polaris";
-import { TitleBar } from "@shopify/app-bridge-react";
-import { useTranslation } from "react-i18next";
+import { Page } from "@shopify/polaris";
 import { useAuthenticatedFetch } from "../hooks";
-import { useEffect, useState } from "react";
-export default function SyncProduct() {
-    let i=0;
-    const [ data, setData ] = useState({});
-    const [ status, setStatus ] = useState({});
+import { useEffect, useRef, useState } from "react";
+import {syncIcon} from "../assets"
+export default function Home() {
+    const fetch = useAuthenticatedFetch();
     const [ loading, setLoading ] = useState(true);
     const [ dataLoading, setDataLoading ] = useState(true);
-    const fetch = useAuthenticatedFetch();
+    let i=0;
+    const [ data, setData ] = useState({});
     useEffect(()=>{
-        fetch('/api/products').then((res)=>{
+        fetch('/api/logdata').then((res)=>{
             return res.json();
         }).then((data)=>{
             setData(data);
@@ -20,24 +18,10 @@ export default function SyncProduct() {
         fetch('/api/syncstatus').then((res)=>{
             return res.json();
         }).then((data)=>{
-            setStatus(data);
+            // setStatus(data);
             setLoading(false);
         })
     },[])
-    function Pagination(e){
-        if(!dataLoading){
-            setDataLoading(true);
-            let target = e.target;
-            let page = target.getAttribute('page');
-            let type = target.getAttribute('type');
-            fetch('/api/products?page='+page+'&type='+type).then((res)=>{
-                return res.json();
-            }).then((data)=>{
-                setData(data);
-                setDataLoading(false);
-            })
-        }
-    }
     return (
         <Page>
             {loading?
@@ -57,19 +41,13 @@ export default function SyncProduct() {
                                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                     <tr>
                                         <th scope="col" className="px-6 py-3">
-                                            Title
+                                            Message
                                         </th>
                                         <th scope="col" className="px-6 py-3">
-                                            Sku
-                                        </th>
-                                        <th scope="col" className="px-6 py-3">
-                                            Status
+                                            Type
                                         </th>
                                         <th scope="col" className="px-6 py-3">
                                             Created
-                                        </th>
-                                        <th scope="col" className="px-6 py-3">
-                                            Updated
                                         </th>
                                         {/* <th scope="col" className="px-6 py-3">
                                             Action
@@ -94,23 +72,17 @@ export default function SyncProduct() {
                                             </td>
                                         </tr>
                                     :
-                                        data.status && data.allpages != 0? data.data.map((product)=>{
+                                        data.status && data.allpages != 0? data.data.map((log)=>{
                                             return(
-                                                <tr key={product.sku} className="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
+                                                <tr key={log.id} className="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
                                                     <th scope="row" className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                                                        {product.title}
+                                                        {log.message}
                                                     </th>
                                                     <td className="px-6 py-4">
-                                                        {product.sku}
+                                                        {log.type}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        {product.status}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        {product.created_status?"Created":"Not Created"}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        {product.updated_status?"Updated":product.created_status?"Syncing":"Not Created"}
+                                                        {log.created_at}
                                                     </td>
                                                 </tr> 
                                             )

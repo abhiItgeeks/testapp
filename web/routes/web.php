@@ -20,6 +20,8 @@ use Shopify\Webhooks\Registry;
 use Shopify\Webhooks\Topics;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\CronController;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -64,7 +66,19 @@ Route::get('/api/auth/callback', function (Request $request) {
 
     $host = $request->query('host');
     $shop = Utils::sanitizeShopDomain($request->query('shop'));
-
+    try {
+        $getdomain = $session->getShop();
+        $getshop = explode('.',$getdomain);
+        if(!Schema::hasTable($getshop[0].'_log')){
+            $tablecreate = Schema::create($getshop[0].'_log', function (Blueprint $table) {
+                $table->id();
+                $table->string('message')->nullable(true);
+                $table->string('type')->nullable(true);
+                $table->timestamp('created_at')->useCurrent();
+            });
+        }
+    } catch (\Throwable $th) {
+    }
     $response = Registry::register('/api/webhooks', Topics::APP_UNINSTALLED, $shop, $session->getAccessToken());
     $response2 = Registry::register('/api/product_delete', Topics::PRODUCTS_DELETE, $shop, $session->getAccessToken());
     if ($response->isSuccess()) {
@@ -168,7 +182,7 @@ Route::get('/api/products', function (Request $request) {
     $shop = explode('.',$domain);
     if(Schema::hasTable($shop[0].'_products')){
         $count = DB::table($shop[0].'_products')->select('*')->get()->count();
-        $allPages = ceil($count / 20); 
+        $allPages = ceil($count / 20);
         if (!empty($request->type)) {
             $type = $request->type;
             $page = $request->page;
@@ -212,3 +226,41 @@ Route::get('/api/syncedProducts',function(Request $request){
     return response(['status'=>false,'message'=>'something went wrong']);
 })->middleware('shopify.auth');
 
+// get log data
+Route::get('/api/logdata',function(Request $request){
+    $session = $request->get('shopifySession');
+    $domain = $session->getShop();
+    $shop = explode('.',$domain);
+    if(Schema::hasTable($shop[0].'_log')){
+        $count = DB::table($shop[0].'_log')->select('*')->get()->count();
+        $allPages = ceil($count / 20);
+        if (!empty($request->type)) {
+            $type = $request->type;
+            $page = $request->page;
+            if ($type == 'prev') {
+                if ($page == 1 && $page < 1) {
+                    $page = 1;
+                }
+                if ($page > 1) {
+                    $page--;
+                }
+            } elseif ($type == 'next') {
+                if ($page < $allPages) {
+                    $page++;
+                }
+            }
+            $newpage = ($page - 1) * 20;
+        }else{
+            $newpage = 0;
+            $page = 1;
+        }
+        $data = DB::table($shop[0].'_log')->select('*')->offset($newpage)->limit(20)->get()->toArray();
+        if(isset($data) && !empty($data)){
+            return response()->json(['status'=>true,'data'=>$data,'page'=>$page,'allpages'=>$allPages]);
+        }
+        else{
+             return response()->json(['status'=>true,'data'=>'data Not Found','page'=>$page,'allpages'=>$allPages]);
+        }
+    }
+    return response(['status'=>true,'data'=>[]]);
+})->middleware('shopify.auth');

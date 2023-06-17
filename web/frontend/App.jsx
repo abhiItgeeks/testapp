@@ -26,6 +26,10 @@ export default function App() {
                   label: ("Products"),
                   destination: "/products",
                 },
+                {
+                  label: ("Log"),
+                  destination: "/log",
+                },
               ]}
             />
             <Routes pages={pages} />

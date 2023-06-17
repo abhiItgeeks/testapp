@@ -23,29 +23,40 @@ export default function Home() {
             if (!mountedRef.current) return null
             setSynced(data)
             setSyncLoading(false)
-        }).catch((e)=>{
-            console.log(e);
-            setSyncLoading(false)
         })
         return () => { 
             mountedRef.current = false
         }
-    })
-    console.log(loading)
+    },[])
     function syncProducts(){
         if(status.sync){
             return false;
         }
-        setSyncLoading(true)
-        fetch('/api/syncProducts').then((res)=>{
-            res.json()
-        }).then((syncData)=>{
-            setSyncLoading(false)
-        })
         setStatus(status=>({
             ...status, sync:true
         }))
+        setSyncLoading(true)
+        fetch('/api/syncProducts').then((res)=>{
+            return res.json()
+        }).then((syncData)=>{
+            if(syncData.status){
+                fetch('/api/syncedProducts').then((res)=>{
+                    return res.json();
+                }).then((data)=>{
+                    if (!mountedRef.current) return null
+                    setSynced(data)
+                    setSyncLoading(false)
+                })
+            }else{
+                setStatus(status=>({
+                    ...status, sync:false
+                }))
+                setSyncLoading(false)
+                setSynced(syncData)
+            }
+        })
     }
+    console.log(synced)
     return(<>
         <Page>
             {loading?
@@ -86,10 +97,14 @@ export default function Home() {
                                 </div>
                             </div>
                         :
-                            <>
-                                <h3 className="m-2">Total Products: <span className="font-extrabold">{synced.status?synced.total:""}</span></h3>
-                                <h3 className="m-2">Synced Products: <span className="font-extrabold">{synced.status?synced.synced:""}</span></h3>
-                            </>
+                            synced.status?
+                                <>
+                                    
+                                    <h3 className="m-2">Total Products: <span className="font-extrabold">{synced.total}</span></h3>
+                                    <h3 className="m-2">Synced Products: <span className="font-extrabold">{synced.synced}</span></h3>
+                                    
+                                </>:
+                            <h3 className="m-2">Error: <span className="font-extrabold">{synced.message}</span></h3>
                         }
                     </div>
                 </div> 

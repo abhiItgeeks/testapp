@@ -67,6 +67,19 @@ class ProductController extends Controller
             });
             
         }
+        if(empty($responseBody)){
+            DB::table('syncing')->where('shop',$shop[0])->update([
+                'sync'=>false,
+                'updated_at'=>date('Y/m/d H:i:s')
+            ]);
+            if(Schema::hasTable($shop[0].'_log')){
+                DB::table($shop[0].'_log')->where('shop',$shop[0])->insert([
+                    'message'=>'some errors occurred while fetching data from seles force',
+                    'type'=>'error'
+                ]);
+            }
+            return response(['status'=>false,'message'=>'some errors occurred while fetching data from seles force']);
+        }
         foreach ($responseBody as $value) {
             if(!empty($value['title'])){
                 $title = $value['title'];
