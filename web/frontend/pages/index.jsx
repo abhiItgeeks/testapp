@@ -31,6 +31,7 @@ export default function Home() {
             mountedRef.current = false
         }
     })
+    console.log(loading)
     function syncProducts(){
         if(status.sync){
             return false;
