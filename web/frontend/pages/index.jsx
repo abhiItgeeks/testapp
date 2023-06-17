@@ -32,9 +32,11 @@ export default function Home() {
         if(status.sync){
             return false;
         }
+        setSyncLoading(true)
         fetch('/api/syncProducts').then((res)=>{
             res.json()
         }).then((syncData)=>{
+            setSyncLoading(false)
         })
         setStatus(status=>({
             ...status, sync:true
