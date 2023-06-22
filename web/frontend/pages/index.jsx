@@ -31,7 +31,7 @@ export default function Home() {
     function syncProducts(){
         if(status.sync){
             return false;
-        }
+        } 
         setStatus(status=>({
             ...status, sync:true
         }))
